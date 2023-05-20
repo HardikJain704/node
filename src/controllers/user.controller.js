@@ -17,58 +17,15 @@ module.exports.getUsersWithPostCount = async (req, res) => {
       User.countDocuments().exec()
     ]);
 
-    const userIds = users.map((user) => user._id);
-
-    const userAgg = await User.aggregate([
-      {
-        $lookup: {
-          from: "posts",
-          let: { userId: "$_id" },
-          pipeline: [
-             { "$addFields": { "userId": { "$toObjectId": "$userId" }}},
-             { $match: { $expr: { $eq: ["$$userId", "$$userId"] } } },
-             { $limit : 5 },
-             { $project: { __v: 0 } }
-          ],
-          as: "posts_count",
-        },
-      },
-      { $addFields: { posts_count: { $size: "$posts_count" } } },
-      { $project: { __v: 0 } }
-    ]);
-
-     console.log(userAgg)
-
-    const postCounts = await Post.aggregate([
-      { $match: { user: { $in: userIds } } },
-      { $group: { _id: "$user", count: { $sum: 1 } } }
-    ]);
-
-    // const userMap = new Map();
-    // users.forEach((user) => userMap.set(user._id.toString(), user));
-
-    // postCounts.forEach((count) => {
-    //   const user = userMap.get(count._id.toString());
-    //   if (user) {
-    //     user.postCount = count.count;
-    //   }
-    // });
-
-    const postCountsMap = new Map();
-    postCounts.forEach((count) => {
-      postCountsMap.set(count._id.toString(), count.count);
-    });
-
     const transformedUsers = users.map((user) => ({
       _id: user._id,
       name: user.name,
-      posts: postCountsMap.get(user._id.toString()) || 0
     }));
 
     const populatedUsers = await Promise.all(
       transformedUsers.map(async (user) => {
-        const posts = await Post.find({ user: user._id }).lean().exec();
-        user.posts = posts;
+        const posts = await Post.find({ userId: user._id }).lean().exec();
+        user.posts = posts.length;
         return user;
       })
     );
