@@ -8,12 +8,20 @@ module.exports.getUsersWithPostCount = async (req, res) => {
 
   try {
     const [users, totalDocs] = await Promise.all([
-      User.find()
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .select("-__v")
-        .exec(),
+      User.aggregate([
+        {
+          $skip : skip
+        },
+        {
+          $limit : limit 
+        },
+         {
+          $project: {
+            _id : 1 ,
+            name : 1
+          }
+         }
+      ]).exec(),
       User.countDocuments().exec()
     ]);
 
@@ -23,7 +31,8 @@ module.exports.getUsersWithPostCount = async (req, res) => {
     }));
 
     const populatedUsers = await Promise.all(
-      transformedUsers.map(async (user) => {
+     users.map(async (user) => {
+      // transformedUsers.map(async (user) => {
         const posts = await Post.find({ userId: user._id }).lean().exec();
         user.posts = posts.length;
         return user;
